@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,22 +34,17 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class CountDown extends ValueNotifier<int> {
-  late StreamSubscription sub;
+const url = 'https://bit.ly/3x7J5Qt';
+const imageHeight = 300.0;
 
-  CountDown({required int from}) : super(from) {
-    sub = Stream.periodic(const Duration(seconds: 1), (v) => from - v)
-        .takeWhile((value) => value >= 0)
-        .listen((event) {
-      this.value = event;
-    });
-  }
-
-  @override
-  void dispose() {
-    sub.cancel();
-    super.dispose();
-  }
+//normalization is the process of creating a range of smaller values using the smallest and biggest desireed numbers.
+//the range created will act as a scale, so if the smallest number is 0 and the buggest 300, on the normalised range, 150 will be 0.5
+extension Normalize on num {
+  num normalized(num selfRangeMin, num selfRangeMax,
+          [num normalizedRangeMin = 0.0, num normalizedRangeMax = 1.0]) =>
+      (normalizedRangeMax - normalizedRangeMin) *
+          ((this - selfRangeMin) / (selfRangeMax - selfRangeMin)) +
+      normalizedRangeMin;
 }
 
 class MyHomePage extends HookWidget {
@@ -56,14 +52,53 @@ class MyHomePage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    //we cache that instance such that we avoid creating of an instance everytime
-    final countDown = useMemoized(() => CountDown(from: 20));
+    //if we don't do this animation with the animation hook, then we have to make it stateful and also use ticker providers, then dispose them off
+    final opacity = useAnimationController(
+        duration: const Duration(seconds: 1),
+        initialValue: 1.0,
+        upperBound: 1.0,
+        lowerBound: 0.0);
+    final size = useAnimationController(
+        duration: const Duration(seconds: 1),
+        initialValue: 1.0,
+        upperBound: 1.0,
+        lowerBound: 0.0);
+    final controller = useScrollController();
 
-    final notiifier = useListenable(countDown);
+    useEffect(() {
+      controller.addListener(() {
+        final newOpacity = max(imageHeight - controller.offset, 0.0);
+        final normalized = newOpacity.normalized(0, imageHeight).toDouble();
+        opacity.value = normalized;
+        size.value = normalized;
+      });
+      return null;
+    }, [controller]);
     return Scaffold(
-        appBar: AppBar(
-          title: const Text('Home Page'),
+      appBar: AppBar(
+        title: const Text('Home Page'),
+      ),
+      body: Column(children: [
+        SizeTransition(
+          sizeFactor: size,
+          axis: Axis.vertical,
+          axisAlignment: -1.0,
+          child: FadeTransition(
+              opacity: opacity,
+              child:
+                  Image.network(url, height: imageHeight, fit: BoxFit.cover)),
         ),
-        body: Text(notiifier.value.toString()));
+        Expanded(
+          child: ListView.builder(
+              controller: controller,
+              itemCount: 100,
+              itemBuilder: ((context, index) {
+                return ListTile(
+                  title: Text('Person ${index + 1}'),
+                );
+              })),
+        )
+      ]),
+    );
   }
 }
