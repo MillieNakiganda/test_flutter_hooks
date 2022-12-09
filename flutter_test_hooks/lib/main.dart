@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -10,8 +12,6 @@ extension CompactMap<T> on Iterable<T?> {
         transform ?? (e) => e,
       ).where((e) => e != null).cast();
 }
-
-const url = 'https://bit.ly/3qYOtDm';
 
 void main() {
   runApp(const MyApp());
@@ -33,25 +33,37 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class CountDown extends ValueNotifier<int> {
+  late StreamSubscription sub;
+
+  CountDown({required int from}) : super(from) {
+    sub = Stream.periodic(const Duration(seconds: 1), (v) => from - v)
+        .takeWhile((value) => value >= 0)
+        .listen((event) {
+      this.value = event;
+    });
+  }
+
+  @override
+  void dispose() {
+    sub.cancel();
+    super.dispose();
+  }
+}
+
 class MyHomePage extends HookWidget {
   const MyHomePage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    //NetworkAssetBundle does the same job as Image.network but we want it to work like a future
-    //since the image keeps reloading and causing rebuilding, we use useMemoized to enable caching
-    final image = useMemoized(() => (NetworkAssetBundle(Uri.parse(url))
-        .load(url)
-        .then((data) => data.buffer.asUint8List())
-        .then((data) => Image.memory(data))));
+    //we cache that instance such that we avoid creating of an instance everytime
+    final countDown = useMemoized(() => CountDown(from: 20));
 
-    // we make it an asyncSnapshot
-    final snapshot = useFuture(image);
+    final notiifier = useListenable(countDown);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home Page'),
-      ),
-      body: Column(children: [snapshot.data].compactMap().toList()),
-    );
+        appBar: AppBar(
+          title: const Text('Home Page'),
+        ),
+        body: Text(notiifier.value.toString()));
   }
 }
