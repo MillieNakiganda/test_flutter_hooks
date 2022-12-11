@@ -63,7 +63,7 @@ class MyHomePage extends HookWidget {
                     controller.sink.add(rotation + 10.0);
                   },
                   child: RotationTransition(
-                      turns: AlwaysStoppedAnimation(rotation),
+                      turns: AlwaysStoppedAnimation(rotation / 360.0),
                       child: Center(child: Image.network(url))),
                 );
               }
